@@ -16,7 +16,6 @@
 package com.google.android.exoplayer.demo;
 
 import com.google.android.exoplayer.ExoPlayer;
-import com.google.android.exoplayer.VideoSurfaceView;
 import com.google.android.exoplayer.audio.AudioCapabilities;
 import com.google.android.exoplayer.audio.AudioCapabilitiesReceiver;
 import com.google.android.exoplayer.demo.player.DashRendererBuilder;
@@ -53,6 +52,7 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -72,7 +72,7 @@ import java.util.Map;
 /**
  * An activity that plays media using {@link DemoPlayer}.
  */
-public class PlayerActivity extends Activity implements SurfaceHolder.Callback, OnClickListener,
+public class PlayerActivity extends Activity implements VideoSurfaceView.Callback, OnClickListener,
     DemoPlayer.Listener, DemoPlayer.TextListener, DemoPlayer.Id3MetadataListener,
     AudioCapabilitiesReceiver.Listener {
 
@@ -150,7 +150,7 @@ public class PlayerActivity extends Activity implements SurfaceHolder.Callback, 
     debugRootView = findViewById(R.id.controls_root);
 
     surfaceView = (VideoSurfaceView) findViewById(R.id.surface_view);
-    surfaceView.getHolder().addCallback(this);
+    surfaceView.addCallback(this);
     debugTextView = (TextView) findViewById(R.id.debug_text_view);
 
     playerStateTextView = (TextView) findViewById(R.id.player_state_view);
@@ -273,7 +273,7 @@ public class PlayerActivity extends Activity implements SurfaceHolder.Callback, 
       playerNeedsPrepare = false;
       updateButtonVisibilities();
     }
-    player.setSurface(surfaceView.getHolder().getSurface());
+    player.setSurface(surfaceView.getSurface());
     player.setPlayWhenReady(true);
   }
 
@@ -337,10 +337,10 @@ public class PlayerActivity extends Activity implements SurfaceHolder.Callback, 
   }
 
   @Override
-  public void onVideoSizeChanged(int width, int height, float pixelWidthAspectRatio) {
+  public void onVideoSizeChanged(int width, int height, float pixelWidthAspectRatio, int rotateDegree) {
     shutterView.setVisibility(View.GONE);
     surfaceView.setVideoWidthHeightRatio(
-        height == 0 ? 1 : (width * pixelWidthAspectRatio) / height);
+        height == 0 ? 1 : (width * pixelWidthAspectRatio) / height, rotateDegree);
   }
 
   // User controls
@@ -503,19 +503,19 @@ public class PlayerActivity extends Activity implements SurfaceHolder.Callback, 
   // SurfaceHolder.Callback implementation
 
   @Override
-  public void surfaceCreated(SurfaceHolder holder) {
+  public void surfaceCreated(Surface surface) {
     if (player != null) {
-      player.setSurface(holder.getSurface());
+      player.setSurface(surface);
     }
   }
 
   @Override
-  public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+  public void surfaceChanged(int width, int height) {
     // Do nothing.
   }
 
   @Override
-  public void surfaceDestroyed(SurfaceHolder holder) {
+  public void surfaceDestroyed() {
     if (player != null) {
       player.blockingClearSurface();
     }

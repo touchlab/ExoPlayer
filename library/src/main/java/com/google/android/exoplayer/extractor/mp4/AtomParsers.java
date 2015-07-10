@@ -48,8 +48,16 @@ import java.util.List;
         && trackType != Track.TYPE_TEXT && trackType != Track.TYPE_TIME_CODE) {
       return null;
     }
+    int videoRotateDegree = 0;
+    Pair<Integer, Long> header;
+    if (trackType == Track.TYPE_VIDEO)
+    {
+      header = AtomParsers.parseTkhd(trak.getLeafAtomOfType(Atom.TYPE_tkhd).data);
 
-    Pair<Integer, Long> header = parseTkhd(trak.getLeafAtomOfType(Atom.TYPE_tkhd).data);
+      videoRotateDegree = parseTkhdWithVideoRotate(trak.getLeafAtomOfType(Atom.TYPE_tkhd).data);
+    } else {
+      header = AtomParsers.parseTkhd(trak.getLeafAtomOfType(Atom.TYPE_tkhd).data);
+    }
     int id = header.first;
     long duration = header.second;
     long movieTimescale = parseMvhd(mvhd.data);
@@ -64,6 +72,10 @@ import java.util.List;
 
     long mediaTimescale = parseMdhd(mdia.getLeafAtomOfType(Atom.TYPE_mdhd).data);
     StsdDataHolder stsdData = parseStsd(stbl.getLeafAtomOfType(Atom.TYPE_stsd).data, durationUs);
+    if (trackType == Track.TYPE_VIDEO)
+    {
+      stsdData.mediaFormat.rotateDegree = (int) videoRotateDegree;
+    }
     return new Track(id, trackType, mediaTimescale, durationUs, stsdData.mediaFormat,
         stsdData.trackEncryptionBoxes, stsdData.nalUnitLengthFieldLength);
   }
@@ -614,4 +626,58 @@ import java.util.List;
 
   }
 
+  /**
+   *   parse geometry matrix in tkhd header.
+   */
+  public static Integer parseTkhdWithVideoRotate(ParsableByteArray tkhd) {
+    Pair<Integer, Long> header = AtomParsers.parseTkhd(tkhd);
+    int position = tkhd.getPosition();
+    int degree = 0;
+    //parse rotation
+    {
+      tkhd.skipBytes(4); //reserve
+      tkhd.skipBytes(4); //reserve
+      tkhd.skipBytes(2); //layer
+      tkhd.skipBytes(2); //alternate group
+      tkhd.skipBytes(2); //volume
+      tkhd.skipBytes(2); //reserve
+      int a  = tkhd.readInt();
+      int b  = tkhd.readInt();
+      int u  = tkhd.readInt();
+      int c  = tkhd.readInt();
+      int d  = tkhd.readInt();
+      int x  = tkhd.readInt();
+      int y  = tkhd.readInt();
+      int w  = tkhd.readInt();
+
+      if (a == fixpoint_cos(0) && b == fixpoint_sin(0) && c == -fixpoint_sin(0) && d == fixpoint_cos(0))
+      {
+        degree = 0;
+      }
+      else if (a == fixpoint_cos(90) && b == fixpoint_sin(90) && c == -fixpoint_sin(90) && d == fixpoint_cos(90))
+      {
+        degree = 90;
+      }
+      else if (a == fixpoint_cos(180) && b == fixpoint_sin(180) && c == -fixpoint_sin(180) && d == fixpoint_cos(180))
+      {
+        degree = 180;
+      }
+      else if (a == fixpoint_cos(270) && b == fixpoint_sin(270) && c == -fixpoint_sin(270) && d == fixpoint_cos(270))
+      {
+        degree = 270;
+      }
+      tkhd.setPosition(position);
+    }
+    return degree;
+  }
+
+  private static int fixpoint_sin(int set_degree) {
+    double radians = Math.toRadians(set_degree);
+    return (int)((1 << 16) * Math.sin(radians));
+  }
+
+  private static int fixpoint_cos(int set_degree) {
+    double radians = Math.toRadians(set_degree);
+    return (int)((1 << 16) * Math.cos(radians));
+  }
 }
